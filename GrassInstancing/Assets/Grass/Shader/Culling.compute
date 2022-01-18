@@ -1,0 +1,66 @@
+﻿#pragma kernel CSMain
+
+float _NearClipPlane;
+float _FarClipPlane;
+
+struct BoundVolume
+{
+  float4x4 transform;
+  float3 center;
+  float radius;
+};
+
+struct Grassinfo
+{
+  float4x4 transform;
+};
+struct DrawCallCommand
+{
+  uint indexCount;
+  uint instanceCount; // InterlockedAdd
+  uint startIndexLocation;
+  uint baseVertexLocation;
+  uint startInstanceLocation;
+};
+
+StructuredBuffer<BoundVolume> _ObjectBoundBuffer;
+StructuredBuffer<uint> _ObjectIndirectBuffer;
+RWStructuredBuffer<uint> _VisibilityIDBuffer;
+RWStructuredBuffer<DrawCallCommand> _DrawCommandBuffer;
+
+cbuffer CullingBuffer
+{
+  float4x4 _ViewMatrix;
+  float4 _GPUCullingFrustum;
+}
+
+bool Cull(uint objectID)
+{
+  BoundVolume bound = _ObjectBoundBuffer[objectID];
+  float3 center = mul(_ViewMatrix, float4(bound.center, 1)).xyz;
+  float radius = bound.radius;
+  bool visible = true;
+  visible = visible && (center.z * _GPUCullingFrustum[1] - abs(center.x) * _GPUCullingFrustum[0] > -radius);
+  visible = visible && (center.z * _GPUCullingFrustum[3] - abs(center.y) * _GPUCullingFrustum[2] > -radius);
+  center.z = -center.z; // opengl viewmatrix
+  visible = visible && (center.z + radius > _NearClipPlane && center.z - radius < _FarClipPlane);
+  return visible;
+}
+
+[numthreads(64, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+  uint workerID = id.x;
+  uint objectID = _ObjectIndirectBuffer[workerID];
+  uint batchID = 0;
+  bool visible = 1;
+
+  visible = Cull(objectID);
+  if (visible)
+  {
+    uint localID;
+    InterlockedAdd(_DrawCommandBuffer[batchID].instanceCount, 1, localID);
+    uint storeID = _DrawCommandBuffer[batchID].startInstanceLocation + localID;
+    _VisibilityIDBuffer[storeID] = objectID;
+  }
+}
