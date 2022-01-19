@@ -18,6 +18,7 @@ public struct Chunk
     bounds = _bounds;
   }
 }
+[Serializable]
 public struct Grass_Cate
 {
   public Material mat;

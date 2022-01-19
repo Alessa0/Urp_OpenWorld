@@ -9,14 +9,17 @@ public class CreateData : Editor
   private static int _grassCountPerMeter = 1;
   private static int _maxGrassCount = 10000;
   public static string TerrainRoot = "Chunks";
+  public static string GrassRoot = "GrassObject";
   [MenuItem("Assets/Create/ChunksData")]
   public static void CreateMyAsset()
   {
     GameObject[] terrainGOs = Util.CollectDataInScene(TerrainRoot);
+    GameObject[] grassGOs = Util.CollectDataInScene(GrassRoot);
     List<List<GrassInfo>> GPUGrass = new List<List<GrassInfo>>(terrainGOs.Length);
     List<List<int>> Indirect = new List<List<int>>(terrainGOs.Length);
     List<int> GrassCount = new List<int>(terrainGOs.Length);
     List<Matrix4x4> M = new List<Matrix4x4>(terrainGOs.Length);
+    List<Grass_Cate> cate = new List<Grass_Cate>(grassGOs.Length);
     for (int i = 0; i < terrainGOs.Length; i++)
     {
       var terrianMesh = terrainGOs[i].GetComponent<MeshFilter>().sharedMesh;
@@ -72,6 +75,13 @@ public class CreateData : Editor
       GPUGrass.Add(grassBound);
       Indirect.Add(IndirectPerTriangles);
     }
+    for (int i = 0; i < grassGOs.Length; i++)
+    {
+      Grass_Cate _Cate = new Grass_Cate();
+      _Cate.mesh = grassGOs[i].GetComponent<MeshFilter>().sharedMesh;
+      _Cate.mat = grassGOs[i].GetComponent<MeshRenderer>().sharedMaterial;
+      cate.Add(_Cate);
+    }
     for (int i = 0; i < terrainGOs.Length; i++)
     {
       GrassChunkData asset = ScriptableObject.CreateInstance<GrassChunkData>();
@@ -79,7 +89,7 @@ public class CreateData : Editor
       asset.grass = GPUGrass[i];
       asset.grassCount = GrassCount[i];
       asset.indirect = Indirect[i];
-
+      asset.grassCate = cate[i%2];
       string name = terrainGOs[i].name;
       AssetDatabase.CreateAsset(asset, "Assets/Resources/GrassChunksData/GPUData_" + name + ".asset");
       AssetDatabase.SaveAssets();
